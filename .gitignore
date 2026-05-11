@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.so
+.env
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Generated outputs
+outputs/logs/
+outputs/predictions/
+outputs/simulations/
+
+# Raw and processed data (keep only sample/)
+data/raw/
+data/processed/
+
+.DS_Store
+*.ipynb_checkpoints/
