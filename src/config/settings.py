@@ -34,11 +34,20 @@ class PredictionWeights:
 
 
 @dataclass
+class DataConfig:
+    start_year: int = 1980
+    results_url: str = "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"
+    goalscorers_url: str = "https://raw.githubusercontent.com/martj42/international_results/master/goalscorers.csv"
+    shootouts_url: str = "https://raw.githubusercontent.com/martj42/international_results/master/shootouts.csv"
+
+
+@dataclass
 class Settings:
     elo: EloConfig = field(default_factory=EloConfig)
     poisson: PoissonConfig = field(default_factory=PoissonConfig)
     simulation: SimulationConfig = field(default_factory=SimulationConfig)
     weights: PredictionWeights = field(default_factory=PredictionWeights)
+    data: DataConfig = field(default_factory=DataConfig)
     data_dir: Path = field(default_factory=lambda: BASE_DIR / "data")
     outputs_dir: Path = field(default_factory=lambda: BASE_DIR / "outputs")
 
