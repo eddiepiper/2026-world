@@ -1,23 +1,27 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypedDict
 
 import pandas as pd
 from loguru import logger
 
-DEFAULT_TEAM_MAP: dict[str, str] = {
-    "Korea Republic": "South Korea",
-    "IR Iran": "Iran",
-    "USA": "United States",
-    "Türkiye": "Turkey",
-    "Côte d'Ivoire": "Ivory Coast",
-    "China PR": "China",
-    "DR Congo": "Congo DR",
-}
+from src.config.settings import DataConfig
+
+
+class QualityReport(TypedDict):
+    total_rows: int
+    missing_values: dict[str, int]
+    duplicates: int
+    invalid_scores: int
+    team_name_issues: int
 
 
 class DataPipeline:
     """Quality-checked ingestion pipeline for international football results."""
+
+    def __init__(self, config: DataConfig | None = None) -> None:
+        self._config = config if config is not None else DataConfig()
 
     # ------------------------------------------------------------------
     # I/O helpers
@@ -39,7 +43,7 @@ class DataPipeline:
     # Quality checks
     # ------------------------------------------------------------------
 
-    def quality_check(self, df: pd.DataFrame) -> dict:
+    def quality_check(self, df: pd.DataFrame) -> QualityReport:
         """Return a quality report without modifying the DataFrame.
 
         Report keys:
@@ -47,9 +51,9 @@ class DataPipeline:
             missing_values    — per-column null counts (only columns with nulls)
             duplicates        — count of rows sharing (date, home_team, away_team)
             invalid_scores    — count of rows with negative or non-numeric scores
-            team_name_issues  — count of team names in DEFAULT_TEAM_MAP
+            team_name_issues  — count of team names in config.team_name_map
         """
-        report: dict = {}
+        report: QualityReport = {}  # type: ignore[assignment]
 
         report["total_rows"] = len(df)
 
@@ -84,7 +88,7 @@ class DataPipeline:
         team_name_issues = 0
         for col in ("home_team", "away_team"):
             if col in df.columns:
-                team_name_issues += int(df[col].isin(DEFAULT_TEAM_MAP).sum())
+                team_name_issues += int(df[col].isin(self._config.team_name_map).sum())
         report["team_name_issues"] = team_name_issues
         if team_name_issues:
             logger.warning(
@@ -102,11 +106,11 @@ class DataPipeline:
         df: pd.DataFrame,
         team_map: dict[str, str] | None = None,
     ) -> pd.DataFrame:
-        """Apply team name normalisation using team_map (defaults to DEFAULT_TEAM_MAP).
+        """Apply team name normalisation using team_map (defaults to config.team_name_map).
 
         Returns a new DataFrame — never mutates the input.
         """
-        mapping = DEFAULT_TEAM_MAP if team_map is None else team_map
+        mapping = self._config.team_name_map if team_map is None else team_map
         out = df.copy()
         for col in ("home_team", "away_team"):
             if col in out.columns:
@@ -195,14 +199,21 @@ class DataPipeline:
     # Coverage logging
     # ------------------------------------------------------------------
 
-    def log_coverage(self, df: pd.DataFrame) -> None:
-        """Log dataset coverage statistics."""
+    def log_coverage(self, df: pd.DataFrame) -> dict[str, int | None]:
+        """Log dataset coverage statistics and return a summary dict.
+
+        Returns:
+            min_year        — earliest match year (None if empty)
+            max_year        — latest match year (None if empty)
+            total_matches   — number of rows
+            unique_teams    — number of distinct team names
+        """
         if df.empty:
             logger.warning("DataFrame is empty — no coverage to report")
-            return
+            return {"min_year": None, "max_year": None, "total_matches": 0, "unique_teams": 0}
 
-        min_year = df["date"].dt.year.min()
-        max_year = df["date"].dt.year.max()
+        min_year = int(df["date"].dt.year.min())
+        max_year = int(df["date"].dt.year.max())
         total_matches = len(df)
 
         all_teams: set[str] = set()
@@ -221,6 +232,13 @@ class DataPipeline:
             logger.info(f"Tournaments: {unique_tourneys} unique")
             logger.info(f"Top 10 by volume:\n{top10.to_string()}")
 
+        return {
+            "min_year": min_year,
+            "max_year": max_year,
+            "total_matches": total_matches,
+            "unique_teams": len(all_teams),
+        }
+
     # ------------------------------------------------------------------
     # Orchestration
     # ------------------------------------------------------------------
@@ -229,13 +247,17 @@ class DataPipeline:
         self,
         raw_path: Path,
         processed_path: Path,
-        start_year: int = 1980,
+        start_year: int | None = None,
     ) -> pd.DataFrame:
-        """Full pipeline: load → quality_check → standardize → clean → log → save."""
+        """Full pipeline: load → quality_check → standardize → clean → log → save.
+
+        start_year defaults to config.start_year when not provided.
+        """
+        effective_start_year = start_year if start_year is not None else self._config.start_year
         df = self.load_raw(raw_path)
         self.quality_check(df)
         df = self.standardize_teams(df)
-        df = self.clean(df, start_year=start_year)
+        df = self.clean(df, start_year=effective_start_year)
         self.log_coverage(df)
         self.save_processed(df, processed_path)
         return df

@@ -39,6 +39,15 @@ class DataConfig:
     results_url: str = "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"
     goalscorers_url: str = "https://raw.githubusercontent.com/martj42/international_results/master/goalscorers.csv"
     shootouts_url: str = "https://raw.githubusercontent.com/martj42/international_results/master/shootouts.csv"
+    team_name_map: dict[str, str] = field(default_factory=lambda: {
+        "Korea Republic": "South Korea",
+        "IR Iran": "Iran",
+        "USA": "United States",
+        "Türkiye": "Turkey",
+        "Côte d'Ivoire": "Ivory Coast",
+        "China PR": "China",
+        "DR Congo": "Congo DR",
+    })
 
 
 @dataclass

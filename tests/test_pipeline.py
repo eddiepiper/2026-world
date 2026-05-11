@@ -6,7 +6,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.ingestion.pipeline import DataPipeline, DEFAULT_TEAM_MAP
+from src.config.settings import DataConfig
+from src.ingestion.pipeline import DataPipeline
+
+DEFAULT_TEAM_MAP = DataConfig().team_name_map
 
 
 # ---------------------------------------------------------------------------
@@ -197,11 +200,17 @@ class TestStandardizeTeams:
 
 class TestCoverageLogging:
     def test_coverage_logging_runs_without_error(self, pipeline):
-        """Just ensure log_coverage does not raise."""
+        """log_coverage returns a summary dict with correct values."""
         df = _make_df()
         # Rename score cols to goals so log_coverage gets a realistic df
         df = df.rename(columns={"home_score": "home_goals", "away_score": "away_goals"})
-        pipeline.log_coverage(df)  # must not raise
+        summary = pipeline.log_coverage(df)
+        assert summary["total_matches"] == len(df)
+        assert summary["min_year"] == df["date"].dt.year.min()
+        assert summary["max_year"] == df["date"].dt.year.max()
+        assert summary["unique_teams"] == len(
+            set(df["home_team"].tolist()) | set(df["away_team"].tolist())
+        )
 
     def test_coverage_logging_empty_df_does_not_raise(self, pipeline):
         df = pd.DataFrame(columns=["date", "home_team", "away_team", "home_goals", "away_goals", "tournament"])

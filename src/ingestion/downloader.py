@@ -5,11 +5,7 @@ from pathlib import Path
 import requests
 from loguru import logger
 
-DATASETS = {
-    "results": "https://raw.githubusercontent.com/martj42/international_results/master/results.csv",
-    "goalscorers": "https://raw.githubusercontent.com/martj42/international_results/master/goalscorers.csv",
-    "shootouts": "https://raw.githubusercontent.com/martj42/international_results/master/shootouts.csv",
-}
+from src.config.settings import DataConfig
 
 
 def download_dataset(url: str, dest: Path, force: bool = False) -> Path:
@@ -43,16 +39,30 @@ def download_dataset(url: str, dest: Path, force: bool = False) -> Path:
     return dest
 
 
-def download_all_datasets(data_dir: Path, force: bool = False) -> dict[str, Path]:
+def download_all_datasets(
+    data_dir: Path,
+    config: DataConfig | None = None,
+    force: bool = False,
+) -> dict[str, Path]:
     """Download results, goalscorers, and shootouts CSVs to data_dir/raw/.
 
+    URLs are pulled from config (defaults to DataConfig()).
     Returns a mapping of dataset name → local path.
     """
+    if config is None:
+        config = DataConfig()
+
     raw_dir = data_dir / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
+    datasets = {
+        "results": config.results_url,
+        "goalscorers": config.goalscorers_url,
+        "shootouts": config.shootouts_url,
+    }
+
     paths: dict[str, Path] = {}
-    for name, url in DATASETS.items():
+    for name, url in datasets.items():
         dest = raw_dir / f"{name}.csv"
         paths[name] = download_dataset(url, dest, force=force)
 
