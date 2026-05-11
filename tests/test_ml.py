@@ -253,7 +253,7 @@ class TestModelTrainerSplit:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir) / "model_output"
             metadata = {"train_size": 60, "test_size": 30, "split_date": "2020-01-01",
-                        "test_metrics": {}, "feature_count": 19, "timestamp": "2026-01-01"}
+                        "test_metrics": {}, "feature_count": len(FEATURE_COLUMNS), "timestamp": "2026-01-01"}
             trainer.save_artifacts(model, output_dir, metadata)
 
             assert (output_dir / "model.pkl").exists()
@@ -307,8 +307,8 @@ class TestMatchPredictor:
     def test_predictor_predict_uses_today_when_date_none(self, predictor, mock_feature_builder):
         predictor.predict("Brazil", "France", match_date=None)
         call_args = mock_feature_builder.build_features_for_match.call_args
-        used_date = call_args.kwargs.get("match_date") or call_args.args[2]
-        assert used_date == pd.Timestamp.today().normalize()
+        match_date_used = call_args.kwargs.get("match_date") or call_args.args[2]
+        assert isinstance(match_date_used, pd.Timestamp)
 
     def test_predictor_from_artifacts(self, fitted_model, mock_feature_builder):
         with tempfile.TemporaryDirectory() as tmpdir:

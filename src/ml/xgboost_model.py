@@ -18,18 +18,20 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier
 
+from src.config.settings import settings
+
 
 @dataclass
 class XGBoostMatchModel:
     """Multiclass XGBoost classifier: H (home win), D (draw), A (away win)."""
 
     params: dict = field(default_factory=lambda: {
-        "n_estimators": 300,
-        "max_depth": 4,
-        "learning_rate": 0.05,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "random_state": 42,
+        "n_estimators": settings.ml.n_estimators,
+        "max_depth": settings.ml.max_depth,
+        "learning_rate": settings.ml.learning_rate,
+        "subsample": settings.ml.subsample,
+        "colsample_bytree": settings.ml.colsample_bytree,
+        "random_state": settings.ml.random_seed,
         "eval_metric": "mlogloss",
     })
 
@@ -52,6 +54,13 @@ class XGBoostMatchModel:
         """
         le = LabelEncoder()
         y_encoded = le.fit_transform(y)
+
+        missing = set("ADH") - set(le.classes_)
+        if missing:
+            raise ValueError(
+                f"Training data missing outcome class(es) {missing}. "
+                "All three outcomes (H, D, A) must be represented."
+            )
 
         self._label_encoder = le
         self.classes_ = list(le.classes_)  # ['A', 'D', 'H']

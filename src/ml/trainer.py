@@ -10,6 +10,7 @@ import pandas as pd
 from loguru import logger
 from sklearn.metrics import accuracy_score, log_loss
 
+from src.config.settings import settings
 from src.features.feature_builder import FeatureBuilder, FEATURE_COLUMNS
 from src.ml.xgboost_model import XGBoostMatchModel
 from src.models.elo_model import EloModel
@@ -25,15 +26,15 @@ class ModelTrainer:
         elo_model: EloModel,
         poisson_model: PoissonModel,
         rankings_df: pd.DataFrame | None = None,
-        test_split_date: str = "2020-01-01",
-        random_seed: int = 42,
+        test_split_date: str | None = None,
+        random_seed: int | None = None,
     ) -> None:
         self._matches_df = matches_df
         self._elo_model = elo_model
         self._poisson_model = poisson_model
         self._rankings_df = rankings_df
-        self._test_split_date = test_split_date
-        self._random_seed = random_seed
+        self._test_split_date = test_split_date or settings.ml.test_split_date
+        self._random_seed = random_seed or settings.ml.random_seed
 
         self._feature_builder = FeatureBuilder(
             matches_df=matches_df,
@@ -99,7 +100,8 @@ class ModelTrainer:
         y_train = train_df["label"]
 
         logger.info("Fitting XGBoostMatchModel on {} training samples…", len(X_train))
-        model = XGBoostMatchModel()
+        params = {**XGBoostMatchModel().params, "random_state": self._random_seed}
+        model = XGBoostMatchModel(params=params)
         model.fit(X_train, y_train)
         logger.info("Model training complete.")
         return model
@@ -109,6 +111,10 @@ class ModelTrainer:
 
         Returns dict with: accuracy, log_loss, brier_score.
         """
+        if test_df.empty:
+            logger.warning("evaluate() called with empty test_df — returning NaN metrics")
+            return {"accuracy": float("nan"), "log_loss": float("nan"), "brier_score": float("nan")}
+
         X_test = test_df[FEATURE_COLUMNS]
         y_test = test_df["label"]
 
@@ -168,11 +174,8 @@ class ModelTrainer:
         feature_df = self.build_feature_matrix()
         train_df, test_df = self.split(feature_df)
 
-        # Train
-        model = XGBoostMatchModel()
-        X_train = train_df[FEATURE_COLUMNS]
-        y_train = train_df["label"]
-        model.fit(X_train, y_train)
+        # Train (reuse train() — no duplication)
+        model = self.train()
 
         # Evaluate
         metrics = self.evaluate(model, test_df)
