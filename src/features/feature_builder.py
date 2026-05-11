@@ -11,7 +11,7 @@ from __future__ import annotations
 import pandas as pd
 from loguru import logger
 
-from src.config.settings import EloConfig
+from src.config.settings import EloConfig, settings
 from src.models.elo_model import EloModel
 from src.models.poisson_model import PoissonModel
 from src.features.rolling_form import RollingFormCalculator
@@ -49,9 +49,9 @@ class FeatureBuilder:
         self,
         matches_df: pd.DataFrame,
         elo_model: EloModel,
-        poisson_model: PoissonModel,
+        poisson_model: PoissonModel | None = None,
         rankings_df: pd.DataFrame | None = None,
-        form_window: int = 5,
+        form_window: int | None = None,
     ) -> None:
         """
         Parameters
@@ -82,10 +82,10 @@ class FeatureBuilder:
         self._elo_model = elo_model
         self._poisson_model = poisson_model
         self._rankings_df = rankings_df
-        self._form_window = form_window
+        self._form_window = form_window if form_window is not None else settings.features.form_window
 
         # Helpers re-used for single-match inference
-        self._form = RollingFormCalculator(self._matches, window=form_window)
+        self._form = RollingFormCalculator(self._matches, window=self._form_window)
         self._strength = TeamStrengthFeatures(
             elo_model=elo_model,
             poisson_model=poisson_model,
@@ -202,9 +202,9 @@ class FeatureBuilder:
         total = len(sorted_matches)
         log_step = max(1, total // 10)
 
-        for i, row in sorted_matches.iterrows():
-            if i % log_step == 0:
-                logger.debug("build_training_matrix: {}/{}", i, total)
+        for count, (_, row) in enumerate(sorted_matches.iterrows()):
+            if count % log_step == 0:
+                logger.debug("build_training_matrix: {}/{}", count, total)
 
             home_team: str = row["home_team"]
             away_team: str = row["away_team"]
@@ -214,7 +214,7 @@ class FeatureBuilder:
             is_neutral: float = self._neutral_flag(row)
 
             # --- compute features BEFORE updating ratings ---
-            feat = self._build_feature_dict(
+            features: dict[str, float] = self._build_feature_dict(
                 home_team=home_team,
                 away_team=away_team,
                 match_date=match_date,
@@ -222,8 +222,9 @@ class FeatureBuilder:
                 form=replay_form,
                 is_neutral=is_neutral,
             )
-            feat["label"] = self._result_label(home_goals, away_goals)
-            rows.append(feat)
+            label: str = self._result_label(home_goals, away_goals)
+            row_data: dict[str, float | str] = {**features, "label": label}
+            rows.append(row_data)
 
             # --- update Elo ratings AFTER features are captured ---
             replay_elo.update_ratings(home_team, away_team, home_goals, away_goals)
