@@ -56,6 +56,18 @@ class FeatureConfig:
 
 
 @dataclass
+class MLConfig:
+    test_split_date: str = "2020-01-01"
+    random_seed: int = 42
+    n_estimators: int = 300
+    max_depth: int = 4
+    learning_rate: float = 0.05
+    subsample: float = 0.8
+    colsample_bytree: float = 0.8
+    model_output_dir: str = "outputs/models"
+
+
+@dataclass
 class Settings:
     elo: EloConfig = field(default_factory=EloConfig)
     poisson: PoissonConfig = field(default_factory=PoissonConfig)
@@ -63,6 +75,7 @@ class Settings:
     weights: PredictionWeights = field(default_factory=PredictionWeights)
     data: DataConfig = field(default_factory=DataConfig)
     features: FeatureConfig = field(default_factory=FeatureConfig)
+    ml: MLConfig = field(default_factory=MLConfig)
     data_dir: Path = field(default_factory=lambda: BASE_DIR / "data")
     outputs_dir: Path = field(default_factory=lambda: BASE_DIR / "outputs")
 
