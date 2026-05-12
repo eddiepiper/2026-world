@@ -75,6 +75,14 @@ class EnsembleConfig:
 
 
 @dataclass
+class DiagnosticsConfig:
+    drift_window: int = 50
+    drift_alert_threshold: float = 2.0
+    stability_n_perturbations: int = 20
+    stability_noise_scale: float = 0.05
+
+
+@dataclass
 class Settings:
     elo: EloConfig = field(default_factory=EloConfig)
     poisson: PoissonConfig = field(default_factory=PoissonConfig)
@@ -84,6 +92,7 @@ class Settings:
     features: FeatureConfig = field(default_factory=FeatureConfig)
     ml: MLConfig = field(default_factory=MLConfig)
     ensemble: EnsembleConfig = field(default_factory=EnsembleConfig)
+    diagnostics: DiagnosticsConfig = field(default_factory=DiagnosticsConfig)
     data_dir: Path = field(default_factory=lambda: BASE_DIR / "data")
     outputs_dir: Path = field(default_factory=lambda: BASE_DIR / "outputs")
 
