@@ -355,6 +355,7 @@ def main() -> None:
         console.print("  python main.py train")
         console.print("  python main.py evaluate")
         console.print("  python main.py benchmark")
+        console.print("  python main.py optimize")
         sys.exit(1)
 
     command = args[0]
@@ -373,6 +374,9 @@ def main() -> None:
         cmd_evaluate()
     elif command == "benchmark":
         cmd_benchmark()
+    elif command == "optimize":
+        from src.cli.optimize_cmd import cmd_optimize
+        cmd_optimize()
     else:
         console.print(f"[red]Unknown command: {command}[/red]")
         sys.exit(1)
