@@ -54,6 +54,17 @@ AI coding assistant instructions for this project.
 - `backtesting.py` — walk-forward backtesting framework for evaluating prediction accuracy over time.
 - `metrics.py` — shared metrics helpers (accuracy, log_loss, brier_score, compute_all_metrics).
 
+### Phase 3a Modules
+
+- `weight_search.py` — validates weights and generates simplex grid for optimization search.
+- `ensemble_optimizer.py` — SLSQP optimizer finding ensemble weights that minimize log loss on the test split. Saves `best_weight_config.json`.
+- `confidence_scorer.py` — 5-factor confidence engine (model agreement, calibration quality, feature completeness, historical reliability, prediction volatility). Weights: 0.35/0.25/0.20/0.15/0.05.
+- `drift_detection.py` — rolling-window drift detector. Compares current window metrics against baseline window; fires `DriftAlert` on statistical deviation.
+- `prediction_stability.py` — perturbation-based stability analysis. Applies Gaussian noise to XGBoost features only (Elo/Poisson are deterministic). Reports stability band: Stable/Moderate/Unstable.
+- `reliability_monitor.py` — thin aggregator composing ConfidenceScorer, DriftDetector, and StabilityAnalyzer into a single `report()` call.
+- `optimize_cmd.py` — CLI implementation for `python main.py optimize`.
+- `diagnostic_cmd.py` — CLI implementations for `python main.py confidence` and `python main.py drift_check`.
+
 ---
 
 ## Coding Conventions
@@ -105,6 +116,9 @@ python main.py simulate
 python main.py train
 python main.py evaluate
 python main.py benchmark
+python main.py optimize
+python main.py confidence Brazil France
+python main.py drift_check
 
 # Tests
 pytest tests/ -v
