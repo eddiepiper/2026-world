@@ -358,6 +358,7 @@ def main() -> None:
         console.print("  python main.py optimize")
         console.print("  python main.py confidence <home_team> <away_team>")
         console.print("  python main.py drift_check")
+        console.print("  python main.py explain <home_team> <away_team> [H|D|A]")
         sys.exit(1)
 
     command = args[0]
@@ -388,6 +389,13 @@ def main() -> None:
     elif command == "drift_check":
         from src.cli.diagnostic_cmd import cmd_drift_check
         cmd_drift_check()
+    elif command == "explain":
+        if len(args) < 3:
+            console.print("[red]explain requires at least two team names[/red]")
+            sys.exit(1)
+        outcome = args[3] if len(args) > 3 else "H"
+        from src.cli.explain_cmd import cmd_explain
+        cmd_explain(args[1], args[2], outcome)
     else:
         console.print(f"[red]Unknown command: {command}[/red]")
         sys.exit(1)
