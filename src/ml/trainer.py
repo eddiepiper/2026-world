@@ -12,6 +12,7 @@ from sklearn.metrics import accuracy_score, log_loss
 
 from src.config.settings import settings
 from src.features.feature_builder import FeatureBuilder, FEATURE_COLUMNS
+from src.ml.calibration import ProbabilityCalibrator
 from src.ml.xgboost_model import XGBoostMatchModel
 from src.models.elo_model import EloModel
 from src.models.poisson_model import PoissonModel
@@ -192,3 +193,37 @@ class ModelTrainer:
         self.save_artifacts(model, output_dir, metadata)
 
         return metrics
+
+    def calibrate(
+        self,
+        model: XGBoostMatchModel,
+        cal_df: pd.DataFrame,
+    ) -> ProbabilityCalibrator:
+        """Fit and return a ProbabilityCalibrator using a calibration DataFrame.
+
+        The caller is responsible for ensuring ``cal_df`` is a *held-out* split
+        that was not used during model training (no leakage).
+
+        Parameters
+        ----------
+        model:
+            A fitted XGBoostMatchModel.
+        cal_df:
+            Calibration DataFrame containing all FEATURE_COLUMNS plus a
+            ``'label'`` column with true outcome labels ('H', 'D', 'A').
+
+        Returns
+        -------
+        ProbabilityCalibrator
+            A fitted calibrator wrapping ``model``.
+        """
+        X_cal = cal_df[FEATURE_COLUMNS]
+        y_cal = cal_df["label"]
+
+        logger.info(
+            "Fitting ProbabilityCalibrator on {} calibration samples…", len(X_cal)
+        )
+        calibrator = ProbabilityCalibrator(model)
+        calibrator.fit(X_cal, y_cal)
+        logger.info("Calibration complete.")
+        return calibrator
