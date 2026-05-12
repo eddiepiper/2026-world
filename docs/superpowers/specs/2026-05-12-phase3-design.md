@@ -246,7 +246,9 @@ This is NOT a Monte Carlo simulation — it's sensitivity analysis on the featur
 
 **File:** `src/explainability/shap_engine.py`
 
-Dependency: `shap` (hard requirement — add to `requirements.txt`)
+Dependency: `shap` (optional — graceful degradation if unavailable)
+
+If `shap` is not installed or no `model.pkl` exists, `explain` and any SHAP-dependent report sections fail with a clear user-facing message (e.g., `"Explainability unavailable: install shap via pip install shap"`) and exit cleanly. No stack traces. Do NOT add shap to `requirements.txt`.
 
 Uses `shap.TreeExplainer(xgb_model.model)`. Two modes:
 - **Global**: `shap_values = explainer.shap_values(X_test)` → mean |SHAP| per feature
@@ -353,10 +355,23 @@ class Settings:
 
 ## 9. New Dependencies
 
-Add to `requirements.txt`:
+No new hard dependencies. `shap` is optional:
+
 ```
-shap>=0.44.0
+# Optional — required only for 'explain' command
+# pip install shap
 ```
+
+`shap_engine.py` guards the import at the top of the file:
+```python
+try:
+    import shap
+    _SHAP_AVAILABLE = True
+except ImportError:
+    _SHAP_AVAILABLE = False
+```
+
+All public functions in `shap_engine.py` check `_SHAP_AVAILABLE` at entry and raise a descriptive `ImportError` if missing. CLI commands catch this and print a clean message instead of a traceback.
 
 ---
 
@@ -369,7 +384,7 @@ Test files to create:
 - `tests/test_confidence_scorer.py`
 - `tests/test_drift_detection.py`
 - `tests/test_prediction_stability.py`
-- `tests/test_shap_engine.py`
+- `tests/test_shap_engine.py` (mock `shap.TreeExplainer`; also test graceful failure when `_SHAP_AVAILABLE = False`)
 - `tests/test_scenario_runner.py`
 - `tests/test_forecast_summary.py`
 
