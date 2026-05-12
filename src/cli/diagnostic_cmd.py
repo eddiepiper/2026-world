@@ -139,3 +139,80 @@ def cmd_confidence(home_team: str, away_team: str) -> None:
     console.print()
     console.print(table)
     console.print()
+
+
+def cmd_drift_check() -> None:
+    """Check for prediction drift on the historical test set."""
+    model_path = settings.outputs_dir / "models" / "model.pkl"
+    if not model_path.exists():
+        console.print(
+            "[bold red]No trained model found.[/bold red] "
+            "Run [bold]python main.py train[/bold] first."
+        )
+        return
+
+    data_path = settings.data_dir / "processed" / "matches.csv"
+    if not data_path.exists():
+        data_path = settings.data_dir / "sample" / "matches.csv"
+    matches_df = load_matches(data_path)
+
+    elo = EloModel(config=settings.elo)
+    elo.train_on_matches(matches_df)
+    poisson = PoissonModel(config=settings.poisson)
+    poisson.fit(matches_df)
+    xgb_model = XGBoostMatchModel.load(model_path)
+    feature_builder = FeatureBuilder(
+        matches_df=matches_df,
+        elo_model=elo,
+        poisson_model=poisson,
+    )
+    ensemble = EnsembleEngine(
+        elo_model=elo,
+        poisson_model=poisson,
+        xgb_model=xgb_model,
+        feature_builder=feature_builder,
+    )
+
+    from src.diagnostics.drift_detection import DriftDetector
+    detector = DriftDetector()
+
+    test_df = matches_df[matches_df["date"] >= settings.ml.test_split_date].copy()
+
+    console.print(Panel(
+        f"Running drift check on [bold]{len(test_df)}[/bold] test matches…",
+        style="blue",
+    ))
+
+    alert_count = 0
+    for _, row in test_df.iterrows():
+        try:
+            pred = ensemble.predict(row["home_team"], row["away_team"])
+            ep = pred["ensemble_probabilities"]
+            probs = {
+                "home_win": ep.get("home_win", 1 / 3),
+                "draw": ep.get("draw", 1 / 3),
+                "away_win": ep.get("away_win", 1 / 3),
+            }
+            alerts = detector.add_record(y_true=row["result"], probs=probs)
+            alert_count += len(alerts)
+        except Exception as exc:
+            logger.debug(f"Skipping {row['home_team']} vs {row['away_team']}: {exc}")
+
+    status = detector.status()
+
+    table = Table(title="Drift Check Status", show_header=True, header_style="bold cyan")
+    table.add_column("Metric", style="white")
+    table.add_column("Value", style="green", justify="right")
+
+    table.add_row("Total records", str(status["total_records"]))
+    table.add_row("Window size", str(status["window_size"]))
+    table.add_row("Has baseline", "Yes" if status["has_baseline"] else "No")
+    table.add_row("Alerts fired", str(alert_count))
+
+    console.print()
+    console.print(table)
+
+    if alert_count > 0:
+        console.print(f"\n[bold yellow]⚠ {alert_count} drift alert(s) detected[/bold yellow]\n")
+    else:
+        console.print("\n[bold green]✓ No drift detected[/bold green]\n")
