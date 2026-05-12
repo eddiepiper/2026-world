@@ -356,6 +356,7 @@ def main() -> None:
         console.print("  python main.py evaluate")
         console.print("  python main.py benchmark")
         console.print("  python main.py optimize")
+        console.print("  python main.py confidence <home_team> <away_team>")
         sys.exit(1)
 
     command = args[0]
@@ -377,6 +378,12 @@ def main() -> None:
     elif command == "optimize":
         from src.cli.optimize_cmd import cmd_optimize
         cmd_optimize()
+    elif command == "confidence":
+        if len(args) != 3:
+            console.print("[red]confidence requires exactly two team names[/red]")
+            sys.exit(1)
+        from src.cli.diagnostic_cmd import cmd_confidence
+        cmd_confidence(args[1], args[2])
     else:
         console.print(f"[red]Unknown command: {command}[/red]")
         sys.exit(1)
