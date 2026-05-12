@@ -1,0 +1,12 @@
+{
+  "train_size": 31281,
+  "test_size": 5883,
+  "split_date": "2020-01-01",
+  "test_metrics": {
+    "accuracy": 0.6066632670406256,
+    "log_loss": 0.8643230823694412,
+    "brier_score": 0.5073294639587402
+  },
+  "feature_count": 19,
+  "timestamp": "2026-05-12T06:01:55.895519+00:00"
+}

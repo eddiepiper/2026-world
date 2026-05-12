@@ -1,0 +1,21 @@
+[
+  "elo_diff",
+  "home_elo",
+  "away_elo",
+  "fifa_diff",
+  "home_attack",
+  "home_defense",
+  "away_attack",
+  "away_defense",
+  "home_win_rate",
+  "away_win_rate",
+  "home_goals_scored",
+  "home_goals_conceded",
+  "away_goals_scored",
+  "away_goals_conceded",
+  "home_clean_sheet_rate",
+  "away_clean_sheet_rate",
+  "home_days_rest",
+  "away_days_rest",
+  "is_neutral"
+]

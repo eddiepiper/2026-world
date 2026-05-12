@@ -16,6 +16,8 @@ build/
 outputs/logs/
 outputs/predictions/
 outputs/simulations/
+outputs/models/model.pkl
+outputs/backtests/
 
 # Raw and processed data (keep only sample/)
 data/raw/
