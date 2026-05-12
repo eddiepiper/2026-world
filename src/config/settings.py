@@ -68,6 +68,13 @@ class MLConfig:
 
 
 @dataclass
+class EnsembleConfig:
+    elo_weight: float = 0.3
+    poisson_weight: float = 0.3
+    xgboost_weight: float = 0.4
+
+
+@dataclass
 class Settings:
     elo: EloConfig = field(default_factory=EloConfig)
     poisson: PoissonConfig = field(default_factory=PoissonConfig)
@@ -76,6 +83,7 @@ class Settings:
     data: DataConfig = field(default_factory=DataConfig)
     features: FeatureConfig = field(default_factory=FeatureConfig)
     ml: MLConfig = field(default_factory=MLConfig)
+    ensemble: EnsembleConfig = field(default_factory=EnsembleConfig)
     data_dir: Path = field(default_factory=lambda: BASE_DIR / "data")
     outputs_dir: Path = field(default_factory=lambda: BASE_DIR / "outputs")
 
