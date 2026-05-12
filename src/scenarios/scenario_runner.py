@@ -89,15 +89,16 @@ class ScenarioRunner:
         form_deltas = {
             p.team: p.delta for p in perturbations if p.param == "recent_form"
         }
-        perturbed = self._blend(home_team, away_team, match_date, form_deltas=form_deltas)
-
-        # Restore
-        for team, rating in saved_elo.items():
-            self._elo.ratings[team] = rating
-        if saved_attack:
-            self._poisson.attack_strength = saved_attack
-        if saved_defense:
-            self._poisson.defense_strength = saved_defense
+        try:
+            perturbed = self._blend(home_team, away_team, match_date, form_deltas=form_deltas)
+        finally:
+            # Restore
+            for team, rating in saved_elo.items():
+                self._elo.ratings[team] = rating
+            if saved_attack:
+                self._poisson.attack_strength = saved_attack
+            if saved_defense:
+                self._poisson.defense_strength = saved_defense
 
         delta = {
             k: round(perturbed[k] - baseline[k], 4)

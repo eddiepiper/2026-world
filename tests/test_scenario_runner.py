@@ -107,3 +107,22 @@ class TestScenarioRunner:
         assert isinstance(md, str)
         assert "Brazil" in md
         assert "France" in md
+
+    def test_state_restored_on_blend_failure(self):
+        """Elo ratings must be restored even if _blend raises."""
+        runner = _make_runner()
+        original_rating = runner._elo.ratings.get("France", 1550.0)
+        # Make the second blend call fail
+        call_count = [0]
+        original_blend = runner._blend
+        def failing_blend(home, away, date, form_deltas=None):
+            call_count[0] += 1
+            if call_count[0] == 2:  # second call (perturbed) fails
+                raise RuntimeError("simulated blend failure")
+            return original_blend(home, away, date, form_deltas=form_deltas)
+        runner._blend = failing_blend
+
+        with pytest.raises(RuntimeError, match="simulated blend failure"):
+            runner.run("Brazil", "France", [Perturbation(param="elo_rating", team="France", delta=100.0)])
+
+        assert runner._elo.ratings.get("France") == original_rating
