@@ -10,8 +10,7 @@ class MarkdownReporter:
         breakdown = confidence.get("factor_breakdown", {})
 
         lines = [
-            "## Confidence Assessment\n",
-            f"**Overall Score:** {score:.3f} | **Band:** {band}\n",
+            f"**Confidence Score:** {score:.3f} | **Band:** {band}\n",
         ]
         if breakdown:
             lines.append("| Factor | Score |")
@@ -27,7 +26,6 @@ class MarkdownReporter:
         alerts = drift.get("alerts", [])
 
         lines = [
-            "## Drift Detection\n",
             f"**Status:** {str(status).upper()} | **Records analysed:** {n}\n",
         ]
 
@@ -54,7 +52,6 @@ class MarkdownReporter:
         stds = stability.get("std_probabilities", {})
 
         lines = [
-            "## Prediction Stability\n",
             f"**Match:** {home} vs {away}",
             f"**Stability Band:** {band}\n",
         ]
@@ -72,16 +69,15 @@ class MarkdownReporter:
             import pandas as pd
             path = Path(benchmark_csv_path)
             if not path.exists():
-                return "## Model Benchmark\n\n_Benchmark results not available._"
+                return "_Benchmark results not available._"
             df = pd.read_csv(path)
             # Find model name column and log_loss column
             name_col = next((c for c in df.columns if "model" in c.lower()), df.columns[0])
             ll_col = next((c for c in df.columns if "log_loss" in c.lower()), None)
             if ll_col is None:
-                return "## Model Benchmark\n\n_log_loss column not found._"
+                return "_log_loss column not found._"
             best_row = df.loc[df[ll_col].idxmin()]
             lines = [
-                "## Model Benchmark\n",
                 f"**Best Model:** {best_row[name_col]} "
                 f"(log loss {best_row[ll_col]:.4f})\n",
                 f"| {name_col.title()} | Accuracy | Log Loss | Brier |",
@@ -95,14 +91,13 @@ class MarkdownReporter:
                 lines.append(f"| {row[name_col]} | {acc} | {row[ll_col]:.4f} | {brier} |")
             return "\n".join(lines)
         except Exception as exc:
-            return f"## Model Benchmark\n\n_Unavailable: {exc}_"
+            return f"_Unavailable: {exc}_"
 
     def shap_section(self, global_shap: dict | None, top_n: int = 10) -> str:
         if not global_shap:
-            return "## Feature Importance (SHAP)\n\n_SHAP not available._"
+            return "_SHAP not available._"
         sorted_features = sorted(global_shap.items(), key=lambda x: x[1], reverse=True)
         lines = [
-            "## Feature Importance (SHAP)\n",
             "| Rank | Feature | Mean |SHAP| |",
             "|------|---------|--------------|",
         ]

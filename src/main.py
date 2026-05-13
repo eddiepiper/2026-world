@@ -360,6 +360,7 @@ def main() -> None:
         console.print("  python main.py drift_check")
         console.print("  python main.py explain <home_team> <away_team> [H|D|A]")
         console.print("  python main.py scenarios [home_team] [away_team]")
+        console.print("  python main.py report")
         sys.exit(1)
 
     command = args[0]
@@ -402,6 +403,9 @@ def main() -> None:
         away = args[2] if len(args) > 2 else "France"
         from src.cli.scenario_cmd import cmd_scenarios
         cmd_scenarios(home, away)
+    elif command == "report":
+        from src.cli.report_cmd import cmd_report
+        cmd_report()
     else:
         console.print(f"[red]Unknown command: {command}[/red]")
         sys.exit(1)
