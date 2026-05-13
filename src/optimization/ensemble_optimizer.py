@@ -103,7 +103,8 @@ class WeightOptimizer:
         for _, row in test_df.iterrows():
             home = row["home_team"]
             away = row["away_team"]
-            outcome = row["result"]  # "H", "D", or "A"
+            hg, ag = int(row["home_goals"]), int(row["away_goals"])
+            outcome = "H" if hg > ag else ("D" if hg == ag else "A")
             match_date = pd.Timestamp(row["date"])
 
             # Elo: returns (win, draw, loss) = (H, D, A) → reorder to [A, D, H]
