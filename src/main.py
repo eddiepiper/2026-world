@@ -412,7 +412,7 @@ def main() -> None:
         from src.cli.report_cmd import cmd_report
         cmd_report()
     elif command == "signals":
-        from src.cli.signals_cmd import (
+        from src.cli.signal_commands import (
             cmd_signals_collect,
             cmd_signals_classify,
             cmd_signals_review,

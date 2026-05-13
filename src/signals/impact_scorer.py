@@ -4,38 +4,45 @@ from dataclasses import dataclass
 
 from src.signals.signal_classifier import ClassifiedSignal, SEVERITY_RANK
 
-# Maximum probability shift per signal type × severity
+# Impact tiers (spec):
+#   low      → 1–2 pp
+#   medium   → 3–5 pp
+#   high     → 6–8 pp
+#   hard cap → 8 pp per signal, no exceptions
+#
 # These are review-layer deltas ONLY — they never touch the core model.
+HARD_CAP: float = 0.08  # absolute ceiling per signal on any single outcome
+
 _MAX_DELTA: dict[str, dict[str, float]] = {
     "injury": {
-        "critical": 0.08,
-        "significant": 0.04,
-        "minor": 0.01,
+        "critical": 0.08,   # high
+        "significant": 0.04,  # medium
+        "minor": 0.01,        # low
     },
     "suspension": {
-        "critical": 0.09,
-        "significant": 0.05,
-        "minor": 0.02,
+        "critical": 0.08,   # high (capped from 0.09 to respect hard cap)
+        "significant": 0.05,  # medium
+        "minor": 0.02,        # low
     },
     "lineup_change": {
-        "critical": 0.03,
-        "significant": 0.02,
-        "minor": 0.005,
+        "critical": 0.05,   # medium
+        "significant": 0.03,  # medium
+        "minor": 0.01,        # low
     },
     "form": {
-        "critical": 0.05,
-        "significant": 0.03,
-        "minor": 0.01,
+        "critical": 0.06,   # high
+        "significant": 0.03,  # medium
+        "minor": 0.01,        # low
     },
     "weather": {
-        "critical": 0.02,
-        "significant": 0.01,
-        "minor": 0.005,
+        "critical": 0.02,   # low
+        "significant": 0.01,  # low
+        "minor": 0.01,        # low
     },
     "travel": {
-        "critical": 0.02,
-        "significant": 0.01,
-        "minor": 0.005,
+        "critical": 0.02,   # low
+        "significant": 0.01,  # low
+        "minor": 0.01,        # low
     },
 }
 
@@ -61,8 +68,8 @@ class ImpactDelta:
     affected_team: str
     rationale: str
 
-    def clamp(self, lo: float = -0.15, hi: float = 0.15) -> "ImpactDelta":
-        """Clamp deltas to sane bounds."""
+    def clamp(self, lo: float = -HARD_CAP, hi: float = HARD_CAP) -> "ImpactDelta":
+        """Enforce per-signal hard cap of ±8 pp on any single outcome."""
         self.home_win_delta = max(lo, min(hi, self.home_win_delta))
         self.draw_delta = max(lo, min(hi, self.draw_delta))
         self.away_win_delta = max(lo, min(hi, self.away_win_delta))

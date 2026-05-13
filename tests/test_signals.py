@@ -199,10 +199,23 @@ class TestImpactScorer:
         assert delta.home_win_delta > 0, "Away suspension should benefit home team"
 
     def test_delta_bounds_respected(self, injury_signal):
+        from src.signals.impact_scorer import HARD_CAP
         delta = score_signal(injury_signal, "Mexico", "Mexico", "South Africa")
-        assert -0.15 <= delta.home_win_delta <= 0.15
-        assert -0.15 <= delta.draw_delta <= 0.15
-        assert -0.15 <= delta.away_win_delta <= 0.15
+        assert -HARD_CAP <= delta.home_win_delta <= HARD_CAP
+        assert -HARD_CAP <= delta.draw_delta <= HARD_CAP
+        assert -HARD_CAP <= delta.away_win_delta <= HARD_CAP
+
+    def test_hard_cap_is_eight_percent(self):
+        from src.signals.impact_scorer import HARD_CAP
+        assert HARD_CAP == 0.08, "Hard cap must be exactly 8 percentage points"
+
+    def test_no_signal_exceeds_hard_cap(self):
+        from src.signals.impact_scorer import HARD_CAP, _MAX_DELTA
+        for sig_type, severities in _MAX_DELTA.items():
+            for severity, max_d in severities.items():
+                assert max_d <= HARD_CAP, (
+                    f"{sig_type}.{severity} = {max_d:.0%} exceeds hard cap {HARD_CAP:.0%}"
+                )
 
     def test_aggregate_deltas_sum(self, injury_signal, suspension_signal):
         d1 = score_signal(injury_signal, "Mexico", "Mexico", "South Africa")
