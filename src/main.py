@@ -9,18 +9,17 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.config.settings import settings
-from src.ingestion.match_loader import load_matches
-from src.ingestion.team_loader import load_teams
-from src.models.elo_model import EloModel
-from src.models.poisson_model import PoissonModel
-from src.models.prediction_engine import PredictionEngine
-from src.simulation.monte_carlo import MonteCarloSimulator
 from src.utils.logger import setup_logging
 
 console = Console()
 
 
-def _build_engine() -> PredictionEngine:
+def _build_engine():  # -> PredictionEngine (lazy to avoid top-level scipy import)
+    from src.ingestion.match_loader import load_matches
+    from src.models.elo_model import EloModel
+    from src.models.poisson_model import PoissonModel
+    from src.models.prediction_engine import PredictionEngine
+
     sample = settings.data_dir / "sample"
     matches_df = load_matches(sample / "matches.csv")
     elo = EloModel(config=settings.elo)
@@ -36,6 +35,7 @@ def _build_engine() -> PredictionEngine:
 
 def _load_matches_df():
     """Load matches: prefer processed CSV, fall back to sample."""
+    from src.ingestion.match_loader import load_matches
     data_path = settings.data_dir / "processed" / "matches.csv"
     if not data_path.exists():
         data_path = settings.data_dir / "sample" / "matches.csv"
@@ -153,6 +153,9 @@ def cmd_predict(home_team: str, away_team: str) -> None:
 
 
 def cmd_simulate(teams: list[str] | None = None) -> None:
+    from src.ingestion.team_loader import load_teams
+    from src.simulation.monte_carlo import MonteCarloSimulator
+
     engine = _build_engine()
 
     if teams is None:
