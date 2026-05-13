@@ -23,6 +23,9 @@ AI coding assistant instructions for this project.
 | Ensemble | `src/ensemble/` | ml, models |
 | Evaluation | `src/evaluation/` | ml, models, features |
 | Simulation | `src/simulation/` | models |
+| Explainability | `src/explainability/` | ml, features (shap optional) |
+| Scenarios | `src/scenarios/` | models, ensemble, features, diagnostics |
+| Reports | `src/reports/` | diagnostics, evaluation |
 | CLI | `src/main.py` | everything above |
 
 **Rule:** Never introduce circular dependencies. Lower layers must not import from higher layers.
@@ -64,6 +67,20 @@ AI coding assistant instructions for this project.
 - `reliability_monitor.py` — thin aggregator composing ConfidenceScorer, DriftDetector, and StabilityAnalyzer into a single `report()` call.
 - `optimize_cmd.py` — CLI implementation for `python main.py optimize`.
 - `diagnostic_cmd.py` — CLI implementations for `python main.py confidence` and `python main.py drift_check`.
+
+### Phase 3b Modules
+
+- `explainability/shap_engine.py` — `SHAPEngine`. Optional-dep wrapper around `shap.TreeExplainer`. Guards import with `_SHAP_AVAILABLE` flag. Raises `ImportError` with install hint if shap is missing. Provides `global_shap(X)` and `local_shap(X, outcome)`.
+- `explainability/feature_impact.py` — `FeatureImpactRanker`. Wraps `SHAPEngine` to rank features by mean |SHAP| and format as markdown.
+- `explainability/prediction_explainer.py` — `PredictionExplainer`. Formats local SHAP into per-match "top drivers" dicts and saves as .md + .json to `outputs/reports/explanations/`.
+- `scenarios/scenario_runner.py` — `ScenarioRunner`. Applies named `Perturbation` objects (attack_strength, defense_strength, elo_rating, recent_form) and returns probability delta tables.
+- `scenarios/upset_analysis.py` — `UpsetAnalyzer`. Flags matches where underdog win prob > threshold, or confidence is Low, or stability is Unstable.
+- `scenarios/stress_tests.py` — `RobustnessTester`. Stress-tests XGBoost against missing/noisy/sparse/extreme feature inputs. Verifies no uncaught exceptions and probabilities remain in [0,1].
+- `reports/markdown_reporter.py` — `MarkdownReporter`. Renders confidence, drift, stability, benchmark, and SHAP into markdown sections.
+- `reports/forecast_summary.py` — `generate_report(sections, output_dir)`. Assembles `ReportSection` list into a dated `forecast_report_YYYY-MM-DD.md`.
+- `cli/explain_cmd.py` — `cmd_explain()`. Calls SHAPEngine with graceful degradation.
+- `cli/scenario_cmd.py` — `cmd_scenarios()`. Runs baseline + two scenario perturbations + upset check.
+- `cli/report_cmd.py` — `cmd_report()`. Orchestrates all Phase 3 signals into a full report.
 
 ---
 
@@ -119,6 +136,9 @@ python main.py benchmark
 python main.py optimize
 python main.py confidence Brazil France
 python main.py drift_check
+python main.py explain Brazil France
+python main.py scenarios Brazil France
+python main.py report
 
 # Tests
 pytest tests/ -v
