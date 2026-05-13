@@ -361,6 +361,11 @@ def main() -> None:
         console.print("  python main.py explain <home_team> <away_team> [H|D|A]")
         console.print("  python main.py scenarios [home_team] [away_team]")
         console.print("  python main.py report")
+        console.print("  python main.py signals collect")
+        console.print("  python main.py signals classify")
+        console.print("  python main.py signals review [home_team] [away_team]")
+        console.print("  python main.py signals report")
+        console.print("  python main.py signals run_daily [home_team] [away_team]")
         sys.exit(1)
 
     command = args[0]
@@ -406,6 +411,34 @@ def main() -> None:
     elif command == "report":
         from src.cli.report_cmd import cmd_report
         cmd_report()
+    elif command == "signals":
+        from src.cli.signals_cmd import (
+            cmd_signals_collect,
+            cmd_signals_classify,
+            cmd_signals_review,
+            cmd_signals_report,
+            cmd_signals_run_daily,
+        )
+        subcommand = args[1] if len(args) > 1 else ""
+        if subcommand == "collect":
+            cmd_signals_collect()
+        elif subcommand == "classify":
+            cmd_signals_classify()
+        elif subcommand == "review":
+            home = args[2] if len(args) > 2 else "Mexico"
+            away = args[3] if len(args) > 3 else "South Africa"
+            cmd_signals_review(home, away)
+        elif subcommand == "report":
+            cmd_signals_report()
+        elif subcommand == "run_daily":
+            home = args[2] if len(args) > 2 else "Mexico"
+            away = args[3] if len(args) > 3 else "South Africa"
+            cmd_signals_run_daily(home, away)
+        else:
+            console.print(
+                "[red]signals subcommands: collect | classify | review | report | run_daily[/red]"
+            )
+            sys.exit(1)
     else:
         console.print(f"[red]Unknown command: {command}[/red]")
         sys.exit(1)
