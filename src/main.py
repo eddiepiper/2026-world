@@ -359,6 +359,7 @@ def main() -> None:
         console.print("  python main.py confidence <home_team> <away_team>")
         console.print("  python main.py drift_check")
         console.print("  python main.py explain <home_team> <away_team> [H|D|A]")
+        console.print("  python main.py scenarios [home_team] [away_team]")
         sys.exit(1)
 
     command = args[0]
@@ -396,6 +397,11 @@ def main() -> None:
         outcome = args[3] if len(args) > 3 else "H"
         from src.cli.explain_cmd import cmd_explain
         cmd_explain(args[1], args[2], outcome)
+    elif command == "scenarios":
+        home = args[1] if len(args) > 1 else "Brazil"
+        away = args[2] if len(args) > 2 else "France"
+        from src.cli.scenario_cmd import cmd_scenarios
+        cmd_scenarios(home, away)
     else:
         console.print(f"[red]Unknown command: {command}[/red]")
         sys.exit(1)
