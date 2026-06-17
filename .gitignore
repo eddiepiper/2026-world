@@ -12,12 +12,8 @@ dist/
 build/
 *.egg-info/
 
-# Generated outputs
-outputs/logs/
-outputs/predictions/
-outputs/simulations/
-outputs/models/model.pkl
-outputs/backtests/
+# Generated outputs (all pipeline artifacts)
+outputs/
 
 # Raw and processed data (keep only sample/)
 data/raw/
