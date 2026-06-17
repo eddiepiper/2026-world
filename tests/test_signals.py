@@ -542,6 +542,78 @@ class TestDeduplication:
 
 # ── Predict Signal Section ────────────────────────────────────────────────────
 
+class TestSignalCountAccuracy:
+    """signals_applied must only include signals that produced non-zero probability deltas."""
+
+    def test_neutral_weather_signal_not_counted(self, mexico_vs_sa):
+        """Weather/travel signals (neutral type) produce zero delta and must not appear in signals_applied."""
+        from src.signals.signal_review import build_review
+        from src.signals.signal_classifier import ClassifiedSignal
+
+        weather_signal = ClassifiedSignal(
+            signal_type="weather",
+            severity="minor",
+            matched_phrase="heat",
+            context_snippet="Mexico face extreme heat conditions",
+            article_title="Mexico face extreme heat conditions",
+            article_link="https://example.com/weather",
+            source_name="Test",
+            team_hint="Mexico",
+            classified_at="2026-06-17T08:00:00+00:00",
+        )
+        review = build_review(mexico_vs_sa, [weather_signal])
+        assert len(review.signals_applied) == 0, (
+            "Weather signal produces zero delta and must not be counted as applied"
+        )
+        assert not review.any_signals
+
+    def test_neutral_travel_signal_not_counted(self, mexico_vs_sa):
+        """Travel signals produce zero delta and must not appear in signals_applied."""
+        from src.signals.signal_review import build_review
+        from src.signals.signal_classifier import ClassifiedSignal
+
+        travel_signal = ClassifiedSignal(
+            signal_type="travel",
+            severity="minor",
+            matched_phrase="Fatigue",
+            context_snippet="South Africa long travel fatigue concerns",
+            article_title="South Africa travel fatigue concerns",
+            article_link="https://example.com/travel",
+            source_name="Test",
+            team_hint="South Africa",
+            classified_at="2026-06-17T08:00:00+00:00",
+        )
+        review = build_review(mexico_vs_sa, [travel_signal])
+        assert len(review.signals_applied) == 0
+
+    def test_injury_signal_is_counted(self, mexico_vs_sa, injury_signal):
+        """An injury signal that produces non-zero delta must appear in signals_applied."""
+        from src.signals.signal_review import build_review
+        review = build_review(mexico_vs_sa, [injury_signal])
+        assert len(review.signals_applied) == 1
+
+    def test_mixed_signals_only_nonzero_counted(self, mexico_vs_sa, injury_signal):
+        """When both neutral and impactful signals match, only the impactful one is counted."""
+        from src.signals.signal_review import build_review
+        from src.signals.signal_classifier import ClassifiedSignal
+
+        weather_signal = ClassifiedSignal(
+            signal_type="weather",
+            severity="minor",
+            matched_phrase="heat",
+            context_snippet="Mexico face extreme heat conditions",
+            article_title="Mexico face extreme heat conditions",
+            article_link="https://example.com/weather",
+            source_name="Test",
+            team_hint="Mexico",
+            classified_at="2026-06-17T08:00:00+00:00",
+        )
+        review = build_review(mexico_vs_sa, [injury_signal, weather_signal])
+        assert len(review.signals_applied) == 1, (
+            f"Expected 1 impactful signal, got {len(review.signals_applied)}"
+        )
+
+
 class TestPredictSignalSection:
     """Signal-adjusted section appears after ensemble in cmd_predict."""
 

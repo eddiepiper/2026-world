@@ -70,10 +70,19 @@ def build_review(
         if not affected:
             continue
 
+        sig_deltas: list[ImpactDelta] = []
         for team in affected:
             delta = score_signal(sig, team, base.home_team, base.away_team)
-            deltas.append(delta)
-        relevant.append(sig)
+            sig_deltas.append(delta)
+
+        # Only count this signal if it produced at least one non-zero delta
+        has_impact = any(
+            abs(d.home_win_delta) > 0 or abs(d.draw_delta) > 0 or abs(d.away_win_delta) > 0
+            for d in sig_deltas
+        )
+        if has_impact:
+            deltas.extend(sig_deltas)
+            relevant.append(sig)
 
     h_adj = base.home_win_prob
     d_adj = base.draw_prob
