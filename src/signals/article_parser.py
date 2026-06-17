@@ -5,6 +5,20 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+# URL path substrings that indicate a non-football sport
+_NON_FOOTBALL_URL_KEYWORDS: frozenset[str] = frozenset([
+    "rugby", "cricket", "tennis", "nfl", "formula-1", "formula1",
+    "golf", "basketball", "nba", "nhl", "swimming", "cycling",
+    "boxing", "american-football",
+])
+
+# Compiled regex for non-football words in article titles
+_NON_FOOTBALL_TITLE_RE = re.compile(
+    r"\b(?:rugby|cricket|tennis|wimbledon|nfl|quarterback|golf|basketball|nba|f1|swimming|baseball)\b"
+    r"|formula\s+1|formula\s+one|grand\s+prix|super\s+bowl|rugby\s+union|rugby\s+league",
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class ParsedArticle:
@@ -48,11 +62,21 @@ def parse_articles(raw_list: list[dict[str, Any]]) -> list[ParsedArticle]:
     return [parse_article(r) for r in raw_list]
 
 
+def is_football_article(article: ParsedArticle) -> bool:
+    """Return False if the article is clearly about a non-football sport."""
+    link_lower = article.link.lower()
+    if any(kw in link_lower for kw in _NON_FOOTBALL_URL_KEYWORDS):
+        return False
+    if _NON_FOOTBALL_TITLE_RE.search(article.full_text):
+        return False
+    return True
+
+
 def filter_relevant(
     articles: list[ParsedArticle],
     keywords: list[str] | None = None,
 ) -> list[ParsedArticle]:
-    """Keep only articles containing at least one keyword."""
+    """Keep only football articles containing at least one signal keyword."""
     if keywords is None:
         keywords = [
             "injury", "injured", "doubt", "ruled out", "miss",
@@ -67,4 +91,4 @@ def filter_relevant(
         text = article.full_text.lower()
         return any(k in text for k in kw_lower)
 
-    return [a for a in articles if _matches(a)]
+    return [a for a in articles if is_football_article(a) and _matches(a)]

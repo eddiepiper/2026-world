@@ -93,11 +93,23 @@ def classify_all(raw_signals: list[RawSignal]) -> list[ClassifiedSignal]:
     return [classify(s) for s in raw_signals]
 
 
+def deduplicate_classified(signals: list[ClassifiedSignal]) -> list[ClassifiedSignal]:
+    """Deduplicate by (article_link, signal_type, team_hint), keeping highest severity."""
+    best: dict[tuple[str, str, str], ClassifiedSignal] = {}
+    for sig in signals:
+        key = (sig.article_link, sig.signal_type, sig.team_hint)
+        existing = best.get(key)
+        if existing is None or SEVERITY_RANK[sig.severity] > SEVERITY_RANK[existing.severity]:
+            best[key] = sig
+    return list(best.values())
+
+
 def save_classified(
     signals: list[ClassifiedSignal],
     processed_dir: Path,
     date_str: str | None = None,
 ) -> Path:
+    signals = deduplicate_classified(signals)
     processed_dir.mkdir(parents=True, exist_ok=True)
     if date_str is None:
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
