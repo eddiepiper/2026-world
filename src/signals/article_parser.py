@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 # URL path substrings that indicate a non-football sport
@@ -16,6 +17,13 @@ _NON_FOOTBALL_URL_KEYWORDS: frozenset[str] = frozenset([
 _NON_FOOTBALL_TITLE_RE = re.compile(
     r"\b(?:rugby|cricket|tennis|wimbledon|nfl|quarterback|golf|basketball|nba|f1|swimming|baseball)\b"
     r"|formula\s+1|formula\s+one|grand\s+prix|super\s+bowl|rugby\s+union|rugby\s+league",
+    re.IGNORECASE,
+)
+
+# Phrases that indicate a match has already been played (post-match reports)
+_POST_MATCH_RE = re.compile(
+    r"\b(?:match report|full[\s-]time|full time|ft:|final score|highlights|"
+    r"recap|as it happened|result:|player ratings|talking points)\b",
     re.IGNORECASE,
 )
 
@@ -72,11 +80,32 @@ def is_football_article(article: ParsedArticle) -> bool:
     return True
 
 
+def _is_fresh(article: ParsedArticle, max_age_days: int) -> bool:
+    """Return True if article is within max_age_days of now, or if date is unparseable."""
+    if not article.published_raw:
+        return True  # fail-open: no date → don't filter
+    try:
+        pub_dt = parsedate_to_datetime(article.published_raw)
+        # Make timezone-aware if naive
+        if pub_dt.tzinfo is None:
+            pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        return pub_dt >= cutoff
+    except Exception:
+        return True  # fail-open: unparseable date → don't filter
+
+
+def _is_post_match(article: ParsedArticle) -> bool:
+    """Return True if the article is a post-match report."""
+    return bool(_POST_MATCH_RE.search(article.full_text))
+
+
 def filter_relevant(
     articles: list[ParsedArticle],
     keywords: list[str] | None = None,
+    max_age_days: int = 7,
 ) -> list[ParsedArticle]:
-    """Keep only football articles containing at least one signal keyword."""
+    """Keep only fresh, pre-match football articles containing at least one signal keyword."""
     if keywords is None:
         keywords = [
             "injury", "injured", "doubt", "ruled out", "miss",
@@ -91,4 +120,10 @@ def filter_relevant(
         text = article.full_text.lower()
         return any(k in text for k in kw_lower)
 
-    return [a for a in articles if is_football_article(a) and _matches(a)]
+    return [
+        a for a in articles
+        if is_football_article(a)
+        and _is_fresh(a, max_age_days)
+        and not _is_post_match(a)
+        and _matches(a)
+    ]

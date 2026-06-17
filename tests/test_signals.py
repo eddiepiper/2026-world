@@ -688,3 +688,80 @@ class TestFootballRelevanceFilter:
             body="Mexico's striker has been ruled out injured ahead of the World Cup match.",
         )
         assert is_football_article(article)
+
+
+# ── Freshness and Post-Match Filter ──────────────────────────────────────────
+
+class TestFreshnessAndPostMatchFilter:
+    """filter_relevant must reject stale and post-match articles."""
+
+    def _make_article(self, title: str, published_raw: str, body: str = "injury doubt miss ruled out") -> "ParsedArticle":
+        from src.signals.article_parser import ParsedArticle
+        return ParsedArticle(
+            source_name="Test",
+            title=title,
+            body=body,
+            link="https://example.com/football/article",
+            published_raw=published_raw,
+            collected_at="2026-06-17T08:00:00Z",
+            source_tags=[],
+        )
+
+    def test_recent_article_passes(self):
+        from src.signals.article_parser import filter_relevant
+        from datetime import datetime, timezone, timedelta
+        recent = datetime.now(timezone.utc) - timedelta(days=1)
+        pub = recent.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        article = self._make_article("Player injury doubt", pub)
+        result = filter_relevant([article], max_age_days=7)
+        assert len(result) == 1
+
+    def test_stale_article_rejected(self):
+        from src.signals.article_parser import filter_relevant
+        article = self._make_article(
+            "Player injury doubt",
+            "Mon, 11 May 2026 10:00:00 GMT",  # > 7 days old
+        )
+        result = filter_relevant([article], max_age_days=7)
+        assert len(result) == 0
+
+    def test_unparseable_date_passes_through(self):
+        from src.signals.article_parser import filter_relevant
+        article = self._make_article("Player injury doubt", "not-a-date")
+        result = filter_relevant([article], max_age_days=7)
+        assert len(result) == 1
+
+    def test_default_max_age_is_7_days(self):
+        from src.signals.article_parser import filter_relevant
+        from datetime import datetime, timezone, timedelta
+        old = datetime.now(timezone.utc) - timedelta(days=10)
+        pub = old.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        article = self._make_article("Player injury doubt", pub)
+        result = filter_relevant([article])  # default max_age_days=7
+        assert len(result) == 0
+
+    def test_post_match_report_rejected(self):
+        from src.signals.article_parser import filter_relevant
+        from datetime import datetime, timezone, timedelta
+        recent = datetime.now(timezone.utc) - timedelta(hours=2)
+        pub = recent.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        article = self._make_article(
+            "Match report: England 2-1 Croatia",
+            pub,
+            body="Full time: England won the match injury doubt",
+        )
+        result = filter_relevant([article], max_age_days=7)
+        assert len(result) == 0
+
+    def test_non_post_match_article_not_filtered(self):
+        from src.signals.article_parser import filter_relevant
+        from datetime import datetime, timezone, timedelta
+        recent = datetime.now(timezone.utc) - timedelta(hours=2)
+        pub = recent.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        article = self._make_article(
+            "England squad injury update ahead of Croatia",
+            pub,
+            body="Player out injured ruled out",
+        )
+        result = filter_relevant([article], max_age_days=7)
+        assert len(result) == 1
