@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.signals.article_parser import ParsedArticle, filter_relevant, parse_article, parse_articles
+from src.signals.article_parser import ParsedArticle, filter_relevant, is_football_article, parse_article, parse_articles
 from src.signals.impact_scorer import (
     ImpactDelta,
     aggregate_deltas,
@@ -18,6 +18,7 @@ from src.signals.signal_classifier import (
     ClassifiedSignal,
     classify,
     classify_all,
+    deduplicate_classified,
     load_classified,
     save_classified,
 )
@@ -429,3 +430,224 @@ class TestGracefulDegradation:
         with patch("src.signals.rss_collector._FEEDPARSER_AVAILABLE", False):
             with pytest.raises(ImportError, match="feedparser"):
                 _require_feedparser()
+
+
+# ── Deduplication ─────────────────────────────────────────────────────────────
+
+class TestDeduplication:
+    def _make_signal(self, link: str, sig_type: str, severity: str, team: str = "England") -> ClassifiedSignal:
+        return ClassifiedSignal(
+            signal_type=sig_type,
+            severity=severity,
+            matched_phrase="test",
+            context_snippet="some context",
+            article_title=f"{team} {sig_type} news",
+            article_link=link,
+            source_name="BBC Sport",
+            team_hint=team,
+            classified_at="2026-05-13T00:00:00+00:00",
+        )
+
+    def test_exact_duplicate_reduced_to_one(self):
+        sig = self._make_signal("https://example.com/1", "injury", "significant")
+        result = deduplicate_classified([sig, sig])
+        assert len(result) == 1
+
+    def test_same_article_and_type_keeps_highest_severity(self):
+        minor = self._make_signal("https://example.com/1", "injury", "minor")
+        critical = self._make_signal("https://example.com/1", "injury", "critical")
+        result = deduplicate_classified([minor, critical])
+        assert len(result) == 1
+        assert result[0].severity == "critical"
+
+    def test_same_article_different_types_both_kept(self):
+        injury = self._make_signal("https://example.com/1", "injury", "significant")
+        suspension = self._make_signal("https://example.com/1", "suspension", "critical")
+        result = deduplicate_classified([injury, suspension])
+        assert len(result) == 2
+
+    def test_same_type_different_articles_both_kept(self):
+        sig1 = self._make_signal("https://example.com/1", "injury", "significant")
+        sig2 = self._make_signal("https://example.com/2", "injury", "significant")
+        result = deduplicate_classified([sig1, sig2])
+        assert len(result) == 2
+
+    def test_save_classified_deduplicates_before_writing(self, injury_signal):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir)
+            save_classified([injury_signal, injury_signal, injury_signal], path, date_str="2026-05-13")
+            loaded = load_classified(path, date_str="2026-05-13")
+            assert len(loaded) == 1
+
+    def test_scotland_travel_duplicate_collapsed(self):
+        travel1 = self._make_signal("https://example.com/scotland-travel", "travel", "minor", "Scotland")
+        travel2 = self._make_signal("https://example.com/scotland-travel", "travel", "minor", "Scotland")
+        result = deduplicate_classified([travel1, travel2])
+        assert len(result) == 1
+
+    def test_ben_white_injury_keeps_highest_severity(self):
+        """Two patterns matching same Ben White article → keep the stronger one."""
+        generic_injury = self._make_signal("https://bbc.co.uk/ben-white", "injury", "significant", "England")
+        knee_injury = self._make_signal("https://bbc.co.uk/ben-white", "injury", "critical", "England")
+        result = deduplicate_classified([generic_injury, knee_injury])
+        assert len(result) == 1
+        assert result[0].severity == "critical"
+
+    def test_same_article_different_teams_both_kept(self):
+        """One article covering two teams' injuries → both adjustments must survive."""
+        mexico_injury = self._make_signal("https://example.com/world-cup", "injury", "significant", "Mexico")
+        sa_injury = self._make_signal("https://example.com/world-cup", "injury", "significant", "South Africa")
+        result = deduplicate_classified([mexico_injury, sa_injury])
+        team_hints = {s.team_hint for s in result}
+        assert "Mexico" in team_hints
+        assert "South Africa" in team_hints
+
+
+# ── Predict Signal Section ────────────────────────────────────────────────────
+
+class TestPredictSignalSection:
+    """Signal-adjusted section appears after ensemble in cmd_predict."""
+
+    def test_no_crash_when_signals_empty(self, mexico_vs_sa):
+        """cmd_predict signal section handles empty signal list without raising."""
+        from src.signals.signal_review import build_review
+        review = build_review(mexico_vs_sa, [])
+        assert not review.any_signals
+        assert review.adjusted_home_win == mexico_vs_sa.home_win_prob
+        assert review.adjusted_draw == mexico_vs_sa.draw_prob
+        assert review.adjusted_away_win == mexico_vs_sa.away_win_prob
+
+    def test_signal_section_adjusts_probabilities(self, mexico_vs_sa, injury_signal):
+        """build_review with a relevant signal shifts probabilities from base."""
+        from src.signals.signal_review import build_review
+        review = build_review(mexico_vs_sa, [injury_signal])
+        assert review.any_signals
+        # Probabilities must differ from base when signal applies
+        changed = (
+            review.adjusted_home_win != mexico_vs_sa.home_win_prob
+            or review.adjusted_draw != mexico_vs_sa.draw_prob
+            or review.adjusted_away_win != mexico_vs_sa.away_win_prob
+        )
+        assert changed, "Signal should shift at least one probability"
+
+    def test_signal_section_probabilities_sum_to_one(self, mexico_vs_sa, injury_signal):
+        """Adjusted probabilities always sum to 1.0 after normalization."""
+        from src.signals.signal_review import build_review
+        review = build_review(mexico_vs_sa, [injury_signal])
+        total = review.adjusted_home_win + review.adjusted_draw + review.adjusted_away_win
+        assert abs(total - 1.0) < 1e-6
+
+
+# ── Football Relevance Filter ─────────────────────────────────────────────────
+
+class TestFootballRelevanceFilter:
+    def _make_article(self, title: str, link: str = "", body: str = "match played") -> ParsedArticle:
+        return ParsedArticle(
+            source_name="Test",
+            title=title,
+            body=body,
+            link=link,
+            published_raw="",
+            collected_at="",
+            source_tags=[],
+        )
+
+    def test_rugby_article_excluded(self):
+        article = self._make_article(
+            "Japan rugby coach banned for three matches",
+            link="https://bbc.co.uk/sport/rugby-union/article",
+        )
+        assert not is_football_article(article)
+
+    def test_rugby_article_excluded_from_filter_relevant(self):
+        article = self._make_article(
+            "Japan rugby coach banned for three matches",
+            link="https://bbc.co.uk/sport/rugby-union/article",
+            body="The Japan rugby union coach received a ban after the incident.",
+        )
+        result = filter_relevant([article])
+        assert len(result) == 0
+
+    def test_japan_rugby_ban_does_not_contaminate_japan_football_signals(self):
+        """A Japan rugby article must not reach the signal classifier for football reviews."""
+        rugby_article = self._make_article(
+            "Japan rugby coach banned",
+            link="https://example.com/rugby-union/japan",
+            body="Japan rugby union coach suspended for three matches after red card incident.",
+        )
+        football_article = self._make_article(
+            "Japan World Cup squad named",
+            link="https://example.com/football/japan-squad",
+            body="Japan named their 26-man World Cup squad. Key players are fit.",
+        )
+        relevant = filter_relevant([rugby_article, football_article])
+        # Only the football article should pass
+        assert not any("rugby" in a.title.lower() for a in relevant)
+        assert any("World Cup" in a.title for a in relevant)
+
+    def test_cricket_article_excluded(self):
+        article = self._make_article(
+            "England cricket captain ruled out injured",
+            link="https://example.com/cricket/england",
+        )
+        assert not is_football_article(article)
+
+    def test_tennis_article_excluded(self):
+        article = self._make_article(
+            "Wimbledon: player suspended after banned substance",
+            link="https://example.com/tennis/wimbledon",
+        )
+        assert not is_football_article(article)
+
+    def test_formula_one_article_excluded(self):
+        article = self._make_article(
+            "F1: driver banned for reckless driving",
+            link="https://example.com/formula-1/driver",
+        )
+        assert not is_football_article(article)
+
+    def test_football_article_passes_sport_filter(self):
+        article = self._make_article(
+            "Brazil striker ruled out with injury ahead of World Cup",
+            link="https://bbc.co.uk/sport/football/brazil-injury",
+        )
+        assert is_football_article(article)
+
+    def test_rugby_url_path_keyword_blocks_article(self):
+        article = self._make_article(
+            "Ireland banned players return",
+            link="https://espn.com/rugby-union/story",
+        )
+        assert not is_football_article(article)
+
+    def test_nfl_article_excluded(self):
+        article = self._make_article(
+            "NFL suspension handed to star quarterback",
+            link="https://espn.com/nfl/story",
+        )
+        assert not is_football_article(article)
+
+    def test_rugby_body_only_article_excluded(self):
+        """Article with generic title/URL but rugby body should still be blocked."""
+        article = self._make_article(
+            "Latest sports news",
+            link="https://example.com/watch/video/12345",
+            body="In rugby union today, the Ireland coach received a touchline ban after the game.",
+        )
+        assert not is_football_article(article)
+
+    def test_cricket_body_only_article_excluded(self):
+        article = self._make_article(
+            "Sports update",
+            link="https://example.com/sport/news",
+            body="England cricket captain ruled out injured ahead of the test series.",
+        )
+        assert not is_football_article(article)
+
+    def test_football_body_passes_with_generic_url(self):
+        article = self._make_article(
+            "Latest from the squad",
+            link="https://example.com/watch/video/99999",
+            body="Mexico's striker has been ruled out injured ahead of the World Cup match.",
+        )
+        assert is_football_article(article)

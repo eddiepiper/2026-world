@@ -76,6 +76,8 @@ def cmd_predict(home_team: str, away_team: str) -> None:
             from src.ml.xgboost_model import XGBoostMatchModel
             from src.features.feature_builder import FeatureBuilder
             from src.ensemble.ensemble_engine import EnsembleEngine
+            from src.models.elo_model import EloModel
+            from src.models.poisson_model import PoissonModel
 
             matches_df = _load_matches_df()
             elo = EloModel(config=settings.elo)
@@ -141,6 +143,82 @@ def cmd_predict(home_team: str, away_team: str) -> None:
 
             console.print()
             console.print(ens_table)
+
+            # Phase 4: Signal-adjusted section
+            try:
+                from src.signals.signal_classifier import load_classified
+                from src.signals.signal_review import BaseForecast, build_review
+
+                _processed_dir = settings.outputs_dir / "signals" / "processed"
+                signals = load_classified(_processed_dir)
+
+                if not signals:
+                    console.print(
+                        "[dim]No signals for today — run "
+                        "[bold]python main.py signals collect[/bold] to fetch latest news.[/dim]"
+                    )
+                else:
+                    base = BaseForecast(
+                        home_team=home_team,
+                        away_team=away_team,
+                        home_win_prob=ep["home_win"],
+                        draw_prob=ep["draw"],
+                        away_win_prob=ep["away_win"],
+                    )
+                    review = build_review(base, signals)
+
+                    if not review.any_signals:
+                        console.print(
+                            f"[dim]No relevant signals found for "
+                            f"{home_team} vs {away_team}.[/dim]"
+                        )
+                    else:
+                        sig_table = Table(
+                            title=f"[bold]Signal-Adjusted[/bold] — {home_team} vs {away_team}",
+                            show_header=True,
+                            header_style="bold yellow",
+                        )
+                        sig_table.add_column("Outcome", style="white")
+                        sig_table.add_column("Ensemble", style="magenta", justify="right")
+                        sig_table.add_column("Signal-Adjusted", style="yellow", justify="right")
+                        sig_table.add_column("Delta", style="cyan", justify="right")
+
+                        def _delta(base_p: float, adj_p: float) -> str:
+                            diff = adj_p - base_p
+                            sign = "+" if diff >= 0 else ""
+                            return f"{sign}{diff:.1%}"
+
+                        sig_table.add_row(
+                            f"{home_team} Win",
+                            f"{ep['home_win']:.1%}",
+                            f"{review.adjusted_home_win:.1%}",
+                            _delta(ep["home_win"], review.adjusted_home_win),
+                        )
+                        sig_table.add_row(
+                            "Draw",
+                            f"{ep['draw']:.1%}",
+                            f"{review.adjusted_draw:.1%}",
+                            _delta(ep["draw"], review.adjusted_draw),
+                        )
+                        sig_table.add_row(
+                            f"{away_team} Win",
+                            f"{ep['away_win']:.1%}",
+                            f"{review.adjusted_away_win:.1%}",
+                            _delta(ep["away_win"], review.adjusted_away_win),
+                        )
+                        sig_table.add_section()
+                        sig_table.add_row(
+                            f"Signals applied",
+                            f"{len(review.signals_applied)}",
+                            "", "",
+                        )
+
+                        console.print()
+                        console.print(sig_table)
+                        console.print(f"[dim]{review.disclaimer}[/dim]")
+            except Exception as exc:
+                logger.warning(f"Signal section failed: {exc}")
+
         except Exception as exc:
             logger.warning(f"Ensemble prediction failed: {exc}")
             console.print(f"[dim]Ensemble unavailable: {exc}[/dim]")
