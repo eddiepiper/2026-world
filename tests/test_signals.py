@@ -790,9 +790,12 @@ class TestFreshnessAndPostMatchFilter:
 
     def test_stale_article_rejected(self):
         from src.signals.article_parser import filter_relevant
+        from datetime import datetime, timezone, timedelta
+        stale = datetime.now(timezone.utc) - timedelta(days=10)
+        pub = stale.strftime("%a, %d %b %Y %H:%M:%S GMT")
         article = self._make_article(
             "Player injury doubt",
-            "Mon, 11 May 2026 10:00:00 GMT",  # > 7 days old
+            pub,  # > 7 days old
         )
         result = filter_relevant([article], max_age_days=7)
         assert len(result) == 0

@@ -22,8 +22,9 @@ _NON_FOOTBALL_TITLE_RE = re.compile(
 
 # Phrases that indicate a match has already been played (post-match reports)
 _POST_MATCH_RE = re.compile(
-    r"\b(?:match report|full[\s-]time|full time|ft:|final score|highlights|"
-    r"recap|as it happened|result:|player ratings|talking points)\b",
+    r"\b(?:match report|full[\s-]time|ft:|final score|"
+    r"recap|as it happened|result:|player ratings|talking points)\b"
+    r"|highlights(?=\s*$|\s*[-–|:])",
     re.IGNORECASE,
 )
 
