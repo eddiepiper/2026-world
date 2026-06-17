@@ -118,6 +118,38 @@ class TestTeamMatcher:
         assert match_signal_to_teams("") == []
 
 
+class TestKnownTeamsExpanded:
+    """All 48 WC2026 fixture teams must be resolvable from article text."""
+
+    @pytest.mark.parametrize("text,expected", [
+        ("Algeria beat Austria in a friendly", ["Algeria", "Austria"]),
+        ("Bosnia and Herzegovina face elimination", ["Bosnia and Herzegovina"]),
+        ("Cape Verde surprise win", ["Cape Verde"]),
+        ("Colombia striker ruled out", ["Colombia"]),
+        ("Curaçao qualify for first time", ["Curaçao"]),
+        ("Czechia goalkeeper injury doubt", ["Czechia"]),
+        ("DR Congo vs Uzbekistan preview", ["DR Congo", "Uzbekistan"]),
+        ("Egypt win on penalties", ["Egypt"]),
+        ("Haiti coach suspended", ["Haiti"]),
+        ("Iraq midfielder banned", ["Iraq"]),
+        ("Ivory Coast striker injured", ["Ivory Coast"]),
+        ("Jordan book last-16 place", ["Jordan"]),
+        ("New Zealand defy the odds", ["New Zealand"]),
+        ("Norway qualify from Group I", ["Norway"]),
+        ("Paraguay hold Uruguay", ["Paraguay"]),
+        ("Scotland earn a point", ["Scotland"]),
+        ("Sweden top their group", ["Sweden"]),
+        ("Turkey advance to knockouts", ["Turkey"]),
+        ("Congo DR and Democratic Republic of Congo aliases", ["DR Congo"]),
+        ("Bosnia alias match", ["Bosnia and Herzegovina"]),
+    ])
+    def test_all_fixture_teams_resolve(self, text, expected):
+        from src.signals.team_matcher import match_signal_to_teams
+        result = match_signal_to_teams(text)
+        for team in expected:
+            assert team in result, f"Expected '{team}' in results for: {text!r}, got {result}"
+
+
 # ── Signal Classifier ────────────────────────────────────────────────────────
 
 class TestSignalClassifier:

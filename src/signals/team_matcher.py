@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-# Canonical team name list (World Cup 2026 participants + common aliases)
 KNOWN_TEAMS: list[str] = [
+    # Tier 1 — established World Cup nations
     "Argentina", "France", "Brazil", "England", "Spain", "Germany",
     "Netherlands", "Portugal", "Belgium", "Croatia", "Italy", "Uruguay",
     "Mexico", "United States", "Canada", "Ecuador", "Senegal", "Morocco",
@@ -14,16 +14,34 @@ KNOWN_TEAMS: list[str] = [
     "Saudi Arabia", "Iran", "Qatar", "Tunisia", "Denmark", "Switzerland",
     "Poland", "Serbia", "Wales", "Costa Rica", "South Africa", "Panama",
     "Honduras", "Jamaica", "El Salvador", "Bolivia",
+    # WC2026 participants missing from original list
+    "Algeria", "Austria", "Bosnia and Herzegovina", "Cape Verde", "Colombia",
+    "Curaçao", "Czechia", "DR Congo", "Egypt", "Haiti", "Iraq", "Ivory Coast",
+    "Jordan", "New Zealand", "Norway", "Paraguay", "Scotland", "Sweden",
+    "Turkey", "Uzbekistan",
 ]
 
 _ALIASES: dict[str, str] = {
+    # United States
     "usa": "United States",
     "u.s.": "United States",
     "u.s.a.": "United States",
     "us": "United States",
+    # Korea
     "korea": "South Korea",
     "republic of korea": "South Korea",
     "dpr korea": "North Korea",
+    # DR Congo
+    "congo dr": "DR Congo",
+    "democratic republic of congo": "DR Congo",
+    "drc": "DR Congo",
+    # Bosnia
+    "bosnia": "Bosnia and Herzegovina",
+    # Ivory Coast
+    "ivory coast": "Ivory Coast",
+    "côte d'ivoire": "Ivory Coast",
+    "cote d'ivoire": "Ivory Coast",
+    # Nicknames
     "england": "England",
     "tres leones": "Mexico",
     "die mannschaft": "Germany",
@@ -32,8 +50,6 @@ _ALIASES: dict[str, str] = {
     "seleção": "Brazil",
     "the socceroos": "Australia",
     "the lions": "Senegal",
-    "ivory coast": "Ivory Coast",
-    "côte d'ivoire": "Ivory Coast",
 }
 
 
