@@ -46,7 +46,7 @@ _PATTERNS: dict[str, list[str]] = {
     "form": [
         r"\bwin streak\b",
         r"\bunbeaten\b",
-        r"\boss streak\b",
+        r"\bloss streak\b",
         r"\bpoor form\b",
         r"\bgood form\b",
         r"\bmomentum\b",
